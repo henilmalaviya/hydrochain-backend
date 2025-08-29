@@ -17,7 +17,30 @@ datasource db {
 model User {
   id String @id @default(uuid())
 
-  sessions Session[]
+  role UserRole
+
+  username String @unique
+  password String
+
+  companyName         String?
+  governmentLicenseId String?
+
+  // plant
+  renewableEnergyProofId String?
+
+  // wallet (plant, industry)
+  walletAddress    String? @unique
+  walletPrivateKey String?
+
+  sessions                   Session[]
+  creditIssueRequests        CreditIssueRequest[] @relation(name: "issuedPlant")
+  creditIssueRequestsActions CreditIssueRequest[] @relation(name: "issueRequestAuditor")
+
+  creditBuyRequests CreditBuyRequest[] @relation(name: "creditBuyerPlant")
+  CreditBuyRequest  CreditBuyRequest[] @relation(name: "creditSellingPlant")
+
+  creditRetireRequests        CreditRetireRequest[] @relation(name: "retiringIndustry")
+  creditRetireRequestsActions CreditRetireRequest[] @relation(name: "retireRequestAuditor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -31,4 +54,70 @@ model Session {
 
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+enum UserRole {
+  Plant
+  Industry
+  Auditor
+}
+
+model CreditIssueRequest {
+  id String @id @default(uuid())
+
+  user   User   @relation(name: "issuedPlant", fields: [userId], references: [id])
+  userId String
+
+  status CreditIssueRequestStatus @default(PENDING)
+
+  actionBy   User?   @relation(name: "issueRequestAuditor", fields: [actionById], references: [id])
+  actionById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CreditIssueRequestStatus {
+  PENDING
+  ISSUED
+  REJECTED
+}
+
+model CreditBuyRequest {
+  id String @id @default(uuid())
+
+  from   User   @relation(name: "creditSellingPlant", fields: [fromId], references: [id])
+  fromId String
+
+  to   User   @relation(name: "creditBuyerPlant", fields: [toId], references: [id])
+  toId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CreditBuyRequestStatus {
+  PENDING
+  TRANSFERRED
+}
+
+model CreditRetireRequest {
+  id String @id @default(uuid())
+
+  user   User   @relation(name: "retiringIndustry", fields: [userId], references: [id])
+  userId String
+
+  status CreditRetireRequestStatus @default(PENDING)
+
+  actionBy   User?   @relation(name: "retireRequestAuditor", fields: [actionById], references: [id])
+  actionById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CreditRetireRequestStatus {
+  PENDING
+  RETIRED
+  REJECTED
 }
