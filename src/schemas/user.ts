@@ -10,6 +10,7 @@ export const BaseUserRegistrationSchema = t.Object({
 	username: t.String({ minLength: 3, maxLength: 50 }),
 	password: UserPasswordSchema,
 	role: UserRoleSchema,
+	auditorUsername: t.String({ minLength: 1 }),
 });
 
 // Plant user registration schema
@@ -20,7 +21,6 @@ export const PlantUserRegistrationSchema = t.Intersect([
 		companyName: t.String({ minLength: 1 }),
 		renewableEnergyProofId: t.String({ minLength: 1 }),
 		governmentLicenseId: t.String({ minLength: 1 }),
-		auditorUsername: t.String({ minLength: 1 }),
 	}),
 ]);
 
@@ -31,7 +31,6 @@ export const IndustryUserRegistrationSchema = t.Intersect([
 		role: t.Literal(UserRole.Industry),
 		companyName: t.String({ minLength: 1 }),
 		governmentLicenseId: t.String({ minLength: 1 }),
-		auditorUsername: t.String({ minLength: 1 }),
 	}),
 ]);
 
