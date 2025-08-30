@@ -25,7 +25,11 @@ export const issuesRoutes = new Elysia({
 					const { user, status } = ctx;
 
 					const { data, error } = await until(() =>
-						createCreditIssueRequest(user.id, ctx.body.amount),
+						createCreditIssueRequest(
+							user.id,
+							ctx.body.amount,
+							ctx.body.metadata,
+						),
 					);
 
 					if (error) {
@@ -42,18 +46,21 @@ export const issuesRoutes = new Elysia({
 						message: 'Credit issue request created successfully',
 						data: {
 							id: creditId,
+							metadata: ctx.body.metadata,
 						},
 					});
 				},
 				{
 					body: t.Object({
 						amount: t.Number(),
+						metadata: t.Optional(t.String()),
 					}),
 					response: {
 						[StatusCodes.CREATED]:
 							Responses.ConstructSuccessResponseSchema(
 								t.Object({
 									id: t.String(),
+									metadata: t.Optional(t.String()),
 								}),
 							),
 						[StatusCodes.INTERNAL_SERVER_ERROR]:

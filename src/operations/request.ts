@@ -35,7 +35,11 @@ export async function getCreditBuyRequestById(buyRequestId: string) {
  * @param amount - The amount of credits to issue.
  * @returns The created request object.
  */
-export async function createCreditIssueRequest(userId: string, amount: number) {
+export async function createCreditIssueRequest(
+	userId: string,
+	amount: number,
+	metadata?: string,
+) {
 	// You may want to validate the amount and userId here
 	// Example: create a new CreditIssueRequest in the database
 	return db.creditIssueRequest.create({
@@ -46,6 +50,7 @@ export async function createCreditIssueRequest(userId: string, amount: number) {
 				},
 			},
 			amount,
+			metadata,
 		},
 	});
 }
