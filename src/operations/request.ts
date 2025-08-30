@@ -55,22 +55,45 @@ export async function acceptCreditIssueRequest(
 	creditId: string,
 	txnHash: string,
 ) {
-	// You may want to validate the userId and creditId here
-	// Example: update the CreditIssueRequest in the database
-	return db.creditIssueRequest.update({
+	// Get the credit issue request to access the amount and the requesting user's ID
+	const creditRequest = await db.creditIssueRequest.findUnique({
 		where: {
 			id: creditId,
 		},
-		data: {
-			status: CreditIssueRequestStatus.ISSUED,
-			txnHash: txnHash, // Store transaction hash
-			actionBy: {
-				connect: {
-					id: userId,
+	});
+
+	if (!creditRequest) {
+		throw new Error('Credit issue request not found');
+	}
+
+	// You may want to validate the userId and creditId here
+	// Example: update the CreditIssueRequest in the database and increase lifeTimeGeneratedCredits
+	return db.$transaction([
+		db.creditIssueRequest.update({
+			where: {
+				id: creditId,
+			},
+			data: {
+				status: CreditIssueRequestStatus.ISSUED,
+				txnHash: txnHash, // Store transaction hash
+				actionBy: {
+					connect: {
+						id: userId,
+					},
 				},
 			},
-		},
-	});
+		}),
+		db.user.update({
+			where: {
+				id: creditRequest.userId,
+			},
+			data: {
+				lifeTimeGeneratedCredits: {
+					increment: creditRequest.amount,
+				},
+			},
+		}),
+	]);
 }
 
 export async function rejectCreditIssueRequest(
@@ -159,16 +182,38 @@ export async function acceptCreditBuyRequest(
 		throw new Error('Credit buy request not found');
 	}
 
-	// Update the CreditBuyRequest in the database with TRANSFERRED status
-	return db.creditBuyRequest.update({
+	const credit = await db.creditIssueRequest.findUnique({
 		where: {
-			id: buyRequestId,
-		},
-		data: {
-			status: CreditBuyRequestStatus.TRANSFERRED,
-			txnHash: txnHash, // Store transaction hash
+			id: buyRequest.creditId,
 		},
 	});
+
+	if (!credit) {
+		throw new Error('Credit not found');
+	}
+
+	// Update the CreditBuyRequest in the database with TRANSFERRED status
+	return db.$transaction([
+		db.creditBuyRequest.update({
+			where: {
+				id: buyRequestId,
+			},
+			data: {
+				status: CreditBuyRequestStatus.TRANSFERRED,
+				txnHash: txnHash, // Store transaction hash
+			},
+		}),
+		db.user.update({
+			where: {
+				id: buyRequest.fromId,
+			},
+			data: {
+				lifeTimeTransferredCredits: {
+					increment: credit.amount,
+				},
+			},
+		}),
+	]);
 }
 
 export async function rejectCreditBuyRequest(buyRequestId: string) {
@@ -179,6 +224,30 @@ export async function rejectCreditBuyRequest(buyRequestId: string) {
 		},
 		data: {
 			status: CreditBuyRequestStatus.REJECTED,
+		},
+	});
+}
+
+export async function createRetireRequest(creditId: string, userId: string) {
+	return db.creditRetireRequest.create({
+		data: {
+			creditId: creditId,
+			user: {
+				connect: {
+					id: userId,
+				},
+			},
+		},
+	});
+}
+
+export async function getRetireRequestById(creditId: string) {
+	return db.creditRetireRequest.findUnique({
+		where: {
+			creditId: creditId,
+		},
+		include: {
+			user: true,
 		},
 	});
 }

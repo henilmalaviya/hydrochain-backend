@@ -44,6 +44,8 @@ export async function getUserTransactions(username: string) {
 			role: true,
 			companyName: true,
 			walletAddress: true,
+			lifeTimeGeneratedCredits: true,
+			lifeTimeTransferredCredits: true,
 		},
 	});
 
@@ -289,6 +291,14 @@ export async function getUserTransactions(username: string) {
 			totalAmount,
 			activeAmount,
 			pendingAmount,
+			lifeTimeGeneratedCredits:
+				user.role === UserRole.Plant
+					? user.lifeTimeGeneratedCredits
+					: undefined,
+			lifeTimeTransferredCredits:
+				user.role === UserRole.Plant
+					? user.lifeTimeTransferredCredits
+					: undefined,
 		},
 		transactions,
 	};

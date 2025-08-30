@@ -131,3 +131,8 @@ export async function executeTransaction(
 	const service = new HydrogenCreditBlockchainService(holderPrivateKey);
 	return await service.transferCredit(creditId, toAddress);
 }
+
+export async function retireCredit(creditId: string, holderPrivateKey: string) {
+	const service = new HydrogenCreditBlockchainService(holderPrivateKey);
+	return await service.retireCredit(creditId);
+}

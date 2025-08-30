@@ -126,8 +126,8 @@ export const buyRoutes = new Elysia({
 						error: false,
 						message: 'Credit buy request accepted successfully',
 						data: {
-							reqId: data.id,
-							creditId: data.creditId,
+							reqId: data[0].id,
+							creditId: data[0].creditId,
 							txnHash: txData.hash,
 						},
 					});

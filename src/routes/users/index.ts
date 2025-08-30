@@ -350,6 +350,12 @@ export const usersRoutes = new Elysia({
 								totalAmount: t.Number(),
 								activeAmount: t.Number(),
 								pendingAmount: t.Number(),
+								lifeTimeGeneratedCredits: t.Optional(
+									t.Number(),
+								),
+								lifeTimeTransferredCredits: t.Optional(
+									t.Number(),
+								),
 							}),
 							transactions: t.Array(
 								t.Object({
