@@ -256,3 +256,19 @@ export async function getRetireRequestById(creditId: string) {
 		},
 	});
 }
+
+export async function getPendingCreditIssueRequests(userId: string) {
+	return db.creditIssueRequest.findMany({
+		where: {
+			user: {
+				assignedAuditor: {
+					id: userId,
+				},
+			},
+			status: CreditIssueRequestStatus.PENDING,
+		},
+		include: {
+			user: true,
+		},
+	});
+}

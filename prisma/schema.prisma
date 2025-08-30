@@ -86,7 +86,7 @@ model CreditIssueRequest {
   actionBy   User?   @relation(name: "issueRequestAuditor", fields: [actionById], references: [id])
   actionById String?
 
-  metadata Json?
+  metadata String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

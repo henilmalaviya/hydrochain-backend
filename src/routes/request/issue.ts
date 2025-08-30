@@ -5,6 +5,7 @@ import {
 	acceptCreditIssueRequest,
 	createCreditIssueRequest,
 	getCreditIssueRequestById,
+	getPendingCreditIssueRequests,
 	rejectCreditIssueRequest,
 } from '@/operations/request';
 import { Responses } from '@nexusog/golakost';
@@ -72,7 +73,7 @@ export const issuesRoutes = new Elysia({
 	.guard((app) =>
 		app
 			.use(authMiddleware([UserRole.Auditor]))
-			// POST /request/issue/:creditId/accept
+			// POST /request/issues/:creditId/accept
 			.post(
 				'/:creditId/accept',
 				async (ctx) => {
@@ -160,7 +161,7 @@ export const issuesRoutes = new Elysia({
 					},
 				},
 			)
-			// POST /request/issue/:creditId/reject
+			// POST /request/issues/:creditId/reject
 			.post(
 				'/:creditId/reject',
 				async (ctx) => {
@@ -225,6 +226,61 @@ export const issuesRoutes = new Elysia({
 						[StatusCodes.INTERNAL_SERVER_ERROR]:
 							Responses.ErrorResponseSchema,
 						[StatusCodes.BAD_REQUEST]:
+							Responses.ErrorResponseSchema,
+					},
+				},
+			)
+			// GET /request/issues
+			// return all the pending issue requests assigned to the auditor
+			.get(
+				'',
+				async (ctx) => {
+					const { user, status } = ctx;
+
+					const { data, error } = await until(() =>
+						getPendingCreditIssueRequests(user.id),
+					);
+
+					if (error) {
+						return status(StatusCodes.INTERNAL_SERVER_ERROR, {
+							error: true,
+							message: `Failed to get pending credit issue requests: ${error.message}`,
+						});
+					}
+
+					return status(StatusCodes.OK, {
+						error: false,
+						message:
+							'Pending credit issue requests retrieved successfully',
+						data: data.map((req) => ({
+							// credit id it self
+							id: req.id,
+							user: {
+								username: req.user.username,
+								companyName: req.user.companyName!,
+							},
+							amount: req.amount,
+							metadata: req.metadata?.toString(),
+						})),
+					});
+				},
+				{
+					response: {
+						[StatusCodes.OK]:
+							Responses.ConstructSuccessResponseSchema(
+								t.Array(
+									t.Object({
+										id: t.String(),
+										user: t.Object({
+											username: t.String(),
+											companyName: t.String(),
+										}),
+										amount: t.Number(),
+										metadata: t.Optional(t.String()),
+									}),
+								),
+							),
+						[StatusCodes.INTERNAL_SERVER_ERROR]:
 							Responses.ErrorResponseSchema,
 					},
 				},
