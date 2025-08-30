@@ -19,6 +19,9 @@ export const env = createEnv({
 
 		// COOKIE NAMES
 		SESSION_COOKIE_NAME: z.string().default('sid'),
+
+		PRIMARY_ETH_ACCOUNT_PRIVATE_KEY: z.string(),
+		ETHER_PROVIDER_URL: z.string(),
 	},
 	isServer: true,
 	runtimeEnv: Bun.env,

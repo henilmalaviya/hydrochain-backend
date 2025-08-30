@@ -3,6 +3,7 @@ import { logger as niceLogger } from '@tqman/nice-logger';
 import { Elysia } from 'elysia';
 import { env } from '@/lib/env';
 import cors from '@elysiajs/cors';
+import { usersRoutes } from './routes/users';
 
 const app = new Elysia({
 	precompile: true,
@@ -21,6 +22,7 @@ const app = new Elysia({
 			withBanner: true,
 		}),
 	)
+	.use(usersRoutes)
 	.get('/', () => 'OK', {
 		tags: ['misc'],
 	})

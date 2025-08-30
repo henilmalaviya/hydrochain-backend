@@ -1,0 +1,54 @@
+import { UserRole } from '@/generated/prisma';
+import { t } from 'elysia';
+
+export const UserIdSchema = t.String();
+export const UserPasswordSchema = t.String();
+export const UserRoleSchema = t.Enum(UserRole);
+
+// Base user registration schema
+export const BaseUserRegistrationSchema = t.Object({
+	username: t.String({ minLength: 3, maxLength: 50 }),
+	password: UserPasswordSchema,
+	role: UserRoleSchema,
+});
+
+// Plant user registration schema
+export const PlantUserRegistrationSchema = t.Intersect([
+	BaseUserRegistrationSchema,
+	t.Object({
+		role: t.Literal(UserRole.Plant),
+		companyName: t.String({ minLength: 1 }),
+		renewableEnergyProofId: t.String({ minLength: 1 }),
+		governmentLicenseId: t.String({ minLength: 1 }),
+	}),
+]);
+
+// Industry user registration schema
+export const IndustryUserRegistrationSchema = t.Intersect([
+	BaseUserRegistrationSchema,
+	t.Object({
+		role: t.Literal(UserRole.Industry),
+		companyName: t.String({ minLength: 1 }),
+		governmentLicenseId: t.String({ minLength: 1 }),
+	}),
+]);
+
+// Auditor user registration schema
+export const AuditorUserRegistrationSchema = t.Intersect([
+	BaseUserRegistrationSchema,
+	t.Object({
+		role: t.Literal(UserRole.Auditor),
+	}),
+]);
+
+// Union schema for registration
+export const UserRegistrationSchema = t.Union([
+	PlantUserRegistrationSchema,
+	IndustryUserRegistrationSchema,
+	AuditorUserRegistrationSchema,
+]);
+
+// Login schema
+export const UserLoginSchema = t.Object({
+	password: t.String(),
+});
