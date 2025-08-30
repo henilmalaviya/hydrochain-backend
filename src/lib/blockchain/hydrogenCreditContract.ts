@@ -15,12 +15,9 @@ export class HydrogenCreditBlockchainService {
 	private contract: ethers.Contract;
 	private wallet: ethers.Wallet;
 
-	constructor() {
-		// Initialize wallet with issuer's private key
-		this.wallet = new ethers.Wallet(
-			env.PRIMARY_ETH_ACCOUNT_PRIVATE_KEY,
-			provider,
-		);
+	constructor(privateKey: string = env.PRIMARY_ETH_ACCOUNT_PRIVATE_KEY) {
+		// Initialize wallet with provided private key (default: issuer)
+		this.wallet = new ethers.Wallet(privateKey, provider);
 		// Initialize contract instance with wallet signer
 		this.contract = new ethers.Contract(
 			env.CONTRACT_ADDRESS,
@@ -123,4 +120,14 @@ export async function issueCreditOnBlockchain(
 export async function getUserBlockchainTransactions(walletAddress: string) {
 	const service = new HydrogenCreditBlockchainService();
 	return await service.getUserTransactions(walletAddress);
+}
+
+// Accepts plant's private key for transfer
+export async function executeTransaction(
+	creditId: string,
+	toAddress: string,
+	holderPrivateKey: string,
+) {
+	const service = new HydrogenCreditBlockchainService(holderPrivateKey);
+	return await service.transferCredit(creditId, toAddress);
 }

@@ -1,5 +1,9 @@
 import db from '@/lib/db';
-import { CreditIssueRequestStatus, User } from '@/generated/prisma';
+import {
+	CreditBuyRequestStatus,
+	CreditIssueRequestStatus,
+	User,
+} from '@/generated/prisma';
 
 export async function getCreditIssueRequestById(creditId: string) {
 	return db.creditIssueRequest.findUnique({
@@ -9,6 +13,18 @@ export async function getCreditIssueRequestById(creditId: string) {
 		include: {
 			user: true,
 			actionBy: true,
+		},
+	});
+}
+
+export async function getCreditBuyRequestById(buyRequestId: string) {
+	return db.creditBuyRequest.findUnique({
+		where: {
+			id: buyRequestId,
+		},
+		include: {
+			from: true,
+			to: true,
 		},
 	});
 }
@@ -73,6 +89,96 @@ export async function rejectCreditIssueRequest(
 					id: userId,
 				},
 			},
+		},
+	});
+}
+
+/**
+ * Creates a credit buy request from an industry to a plant
+ * @param toId - The ID of the industry user buying the credit
+ * @param creditId - The ID of the credit to be transferred
+ * @returns The created buy request object
+ */
+export async function createCreditBuyRequest(toId: string, creditId: string) {
+	// Verify that the credit exists, is ISSUED, and hasn't already been transferred
+	const creditRequest = await db.creditIssueRequest.findFirst({
+		where: {
+			id: creditId,
+			status: CreditIssueRequestStatus.ISSUED,
+		},
+		include: {
+			user: true,
+		},
+	});
+
+	if (!creditRequest) {
+		throw new Error('Credit issue request not found or not issued');
+	}
+
+	// Check if this credit is already involved in a completed transfer
+	const existingTransfer = await db.creditBuyRequest.findFirst({
+		where: {
+			creditId,
+			status: CreditBuyRequestStatus.TRANSFERRED,
+		},
+	});
+
+	if (existingTransfer) {
+		throw new Error('This credit has already been transferred');
+	}
+
+	return db.creditBuyRequest.create({
+		data: {
+			from: {
+				connect: {
+					id: creditRequest.user.id, // Connect to the plant user who issued the credit
+				},
+			},
+			to: {
+				connect: {
+					id: toId, // Connect to the industry user who is buying
+				},
+			},
+			creditId,
+		},
+	});
+}
+
+export async function acceptCreditBuyRequest(
+	buyRequestId: string,
+	txnHash: string,
+) {
+	// Get the buy request to update including the credit ID
+	const buyRequest = await db.creditBuyRequest.findUnique({
+		where: {
+			id: buyRequestId,
+		},
+	});
+
+	if (!buyRequest) {
+		throw new Error('Credit buy request not found');
+	}
+
+	// Update the CreditBuyRequest in the database with TRANSFERRED status
+	return db.creditBuyRequest.update({
+		where: {
+			id: buyRequestId,
+		},
+		data: {
+			status: CreditBuyRequestStatus.TRANSFERRED,
+			txnHash: txnHash, // Store transaction hash
+		},
+	});
+}
+
+export async function rejectCreditBuyRequest(buyRequestId: string) {
+	// Update the CreditBuyRequest in the database with REJECTED status
+	return db.creditBuyRequest.update({
+		where: {
+			id: buyRequestId,
+		},
+		data: {
+			status: CreditBuyRequestStatus.REJECTED,
 		},
 	});
 }

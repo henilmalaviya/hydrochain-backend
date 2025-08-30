@@ -105,6 +105,8 @@ model CreditBuyRequest {
   to   User   @relation(name: "creditBuyerPlant", fields: [toId], references: [id])
   toId String
 
+  status CreditBuyRequestStatus @default(PENDING)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -112,6 +114,7 @@ model CreditBuyRequest {
 enum CreditBuyRequestStatus {
   PENDING
   TRANSFERRED
+  REJECTED
 }
 
 model CreditRetireRequest {

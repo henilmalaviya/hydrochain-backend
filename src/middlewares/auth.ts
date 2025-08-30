@@ -57,6 +57,8 @@ export const authMiddleware = (allowedRoles?: UserRole[]) => {
 				username: session.user.username,
 				role: session.user.role,
 				assignedAuditorId: session.user.assignedAuditorId,
+				walletAddress: session.user.walletAddress,
+				walletPrivateKey: session.user.walletPrivateKey,
 			},
 		};
 	});

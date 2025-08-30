@@ -356,9 +356,12 @@ export const usersRoutes = new Elysia({
 									id: t.String(),
 									amount: t.Number(), // Keeping as number as requested
 									issuedAt: t.String(), // Using ISO string format
-									status: t.Enum(CreditIssueRequestStatus),
+									status: t.String(),
 									issuer: t.Optional(t.String()),
-									txnHash: t.Optional(t.String()), // Adding txnHash
+									sender: t.Optional(t.String()),
+									recipient: t.Optional(t.String()),
+									txnHash: t.Optional(t.String()),
+									type: t.String(), // ISSUE, TRANSFER_IN, TRANSFER_OUT
 								}),
 							),
 						}),
