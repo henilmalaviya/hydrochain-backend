@@ -6,7 +6,7 @@ import cors from '@elysiajs/cors';
 import { usersRoutes } from './routes/users';
 import { logger } from '@/lib/logger';
 import { requestRoutes } from './routes/request';
-import { userRoutes } from './routes/user';
+import { meRoutes } from './routes/me';
 
 logger.info('🚀 Starting HydroChain Backend Server...');
 
@@ -29,7 +29,7 @@ const app = new Elysia({
 	)
 	.use(usersRoutes)
 	.use(requestRoutes)
-	.use(userRoutes)
+	.use(meRoutes)
 	.get(
 		'/',
 		() => {

@@ -37,6 +37,7 @@ export async function createCreditIssueRequest(userId: string, amount: number) {
 export async function acceptCreditIssueRequest(
 	userId: string,
 	creditId: string,
+	txnHash: string,
 ) {
 	// You may want to validate the userId and creditId here
 	// Example: update the CreditIssueRequest in the database
@@ -46,6 +47,7 @@ export async function acceptCreditIssueRequest(
 		},
 		data: {
 			status: CreditIssueRequestStatus.ISSUED,
+			txnHash: txnHash, // Store transaction hash
 			actionBy: {
 				connect: {
 					id: userId,

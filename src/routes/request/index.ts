@@ -119,7 +119,7 @@ export const requestRoutes = new Elysia({
 					}
 
 					const { error } = await until(() =>
-						acceptCreditIssueRequest(user.id, creditId),
+						acceptCreditIssueRequest(user.id, creditId, txn.hash),
 					);
 
 					if (error) {

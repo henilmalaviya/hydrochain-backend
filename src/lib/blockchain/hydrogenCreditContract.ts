@@ -56,7 +56,13 @@ export class HydrogenCreditBlockchainService {
 	}
 
 	async getUserTransactions(walletAddress: string): Promise<{
-		credits: any[];
+		credits: {
+			id: string;
+			amount: number;
+			timestamp: string;
+			retired: boolean;
+			issuer: string;
+		}[];
 		totalAmount: number;
 		activeAmount: number;
 		retiredAmount: number;
@@ -73,18 +79,28 @@ export class HydrogenCreditBlockchainService {
 		let activeAmount = 0;
 		let retiredAmount = 0;
 
-		userCredits.forEach((credit) => {
+		const formattedCredits = userCredits.map((credit) => {
+			const amount = Number(credit.amount);
+
 			if (credit.retired) {
-				retiredAmount += Number(credit.amount);
+				retiredAmount += amount;
 			} else {
-				activeAmount += Number(credit.amount);
+				activeAmount += amount;
 			}
+
+			return {
+				id: credit.id,
+				amount: amount,
+				timestamp: String(credit.timestamp),
+				retired: credit.retired,
+				issuer: credit.issuer,
+			};
 		});
 
 		const totalAmount = activeAmount + retiredAmount;
 
 		return {
-			credits: userCredits,
+			credits: formattedCredits,
 			totalAmount,
 			activeAmount,
 			retiredAmount,

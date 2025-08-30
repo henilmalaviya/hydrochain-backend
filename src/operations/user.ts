@@ -1,6 +1,5 @@
 import db from '@/lib/db';
 import { UserRole } from '@/generated/prisma';
-import { getUserBlockchainTransactions } from '@/lib/blockchain/hydrogenCreditContract';
 
 /**
  * Gets a user by ID with their details
@@ -11,6 +10,19 @@ export async function getUserById(userId: string) {
 	return db.user.findUnique({
 		where: {
 			id: userId,
+		},
+		select: {
+			id: true,
+			username: true,
+			role: true,
+			companyName: true,
+			walletAddress: true,
+			assignedAuditor: {
+				select: {
+					id: true,
+					username: true,
+				},
+			},
 		},
 	});
 }
@@ -35,8 +47,8 @@ export async function getUserTransactions(username: string) {
 		},
 	});
 
-	if (!user || !user.walletAddress) {
-		throw new Error('User not found or user has no wallet address');
+	if (!user) {
+		throw new Error('User not found');
 	}
 
 	// Check if user is Plant or Industry
@@ -46,10 +58,52 @@ export async function getUserTransactions(username: string) {
 		);
 	}
 
-	// Get transaction data from blockchain
-	const transactionData = await getUserBlockchainTransactions(
-		user.walletAddress,
-	);
+	// Get credit issue requests from the database with actionBy details
+	const creditIssueRequests = await db.creditIssueRequest.findMany({
+		where: {
+			userId: user.id,
+		},
+		include: {
+			actionBy: {
+				select: {
+					id: true,
+					username: true,
+					role: true,
+				},
+			},
+		},
+		orderBy: {
+			createdAt: 'desc',
+		},
+	});
+
+	// Calculate credit summary
+	let totalAmount = 0;
+	let activeAmount = 0;
+	let pendingAmount = 0;
+
+	creditIssueRequests.forEach((request) => {
+		totalAmount += request.amount;
+		if (request.status === 'ISSUED') {
+			// Issued credits are active
+			activeAmount += request.amount;
+		} else if (request.status === 'PENDING') {
+			// Pending credits count towards total but aren't active yet
+			pendingAmount += request.amount;
+		}
+	});
+
+	// Format the transactions
+	const transactions = creditIssueRequests.map((request) => {
+		return {
+			id: request.id,
+			amount: request.amount,
+			issuedAt: request.createdAt.toISOString(),
+			status: request.status, // Already in the format we want (PENDING, ISSUED, REJECTED)
+			issuer: request.actionBy ? request.actionBy.username : undefined, // Use actionBy if available, else default
+			txnHash: request.txnHash || undefined,
+		};
+	});
 
 	return {
 		user: {
@@ -57,21 +111,13 @@ export async function getUserTransactions(username: string) {
 			username: user.username,
 			role: user.role,
 			companyName: user.companyName || undefined,
-			walletAddress: user.walletAddress,
+			walletAddress: user.walletAddress!,
 		},
 		creditSummary: {
-			totalAmount: transactionData.totalAmount,
-			activeAmount: transactionData.activeAmount,
-			retiredAmount: transactionData.retiredAmount,
+			totalAmount,
+			activeAmount,
+			pendingAmount,
 		},
-		transactions: transactionData.credits.map((credit) => ({
-			id: credit.id,
-			amount: Number(credit.amount),
-			issuedAt: new Date(Number(credit.timestamp) * 1000).toISOString(),
-			status: credit.retired
-				? 'RETIRED'
-				: ('ACTIVE' as 'RETIRED' | 'ACTIVE'),
-			issuer: credit.issuer,
-		})),
+		transactions,
 	};
 }

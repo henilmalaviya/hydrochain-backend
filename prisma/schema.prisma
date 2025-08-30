@@ -75,7 +75,8 @@ model CreditIssueRequest {
   user   User   @relation(name: "issuedPlant", fields: [userId], references: [id])
   userId String
 
-  amount Float
+  amount  Float
+  txnHash String?
 
   status CreditIssueRequestStatus @default(PENDING)
 
@@ -99,6 +100,7 @@ model CreditBuyRequest {
   fromId String
 
   creditId String
+  txnHash  String?
 
   to   User   @relation(name: "creditBuyerPlant", fields: [toId], references: [id])
   toId String
@@ -119,6 +121,7 @@ model CreditRetireRequest {
   userId String
 
   creditId String
+  txnHash  String?
 
   status CreditRetireRequestStatus @default(PENDING)
 

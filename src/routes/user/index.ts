@@ -1,6 +1,6 @@
-import { UserRole } from '@/generated/prisma';
+import { CreditIssueRequestStatus, UserRole } from '@/generated/prisma';
 import { authMiddleware } from '@/middlewares/auth';
-import { getUserTransactions } from '@/operations/user';
+import { getUserById, getUserTransactions } from '@/operations/user';
 import { Responses } from '@nexusog/golakost';
 import { until } from '@open-draft/until';
 import Elysia, { t } from 'elysia';
@@ -12,13 +12,7 @@ export const userRoutes = new Elysia({
 	tags: ['users'],
 }).guard((app) =>
 	app
-		.use(
-			authMiddleware([
-				UserRole.Plant,
-				UserRole.Industry,
-				UserRole.Auditor,
-			]),
-		)
+		.use(authMiddleware())
 		// GET /user/:username - Get user transaction history
 		.get(
 			'/:username',
@@ -91,18 +85,16 @@ export const userRoutes = new Elysia({
 							creditSummary: t.Object({
 								totalAmount: t.Number(),
 								activeAmount: t.Number(),
-								retiredAmount: t.Number(),
+								pendingAmount: t.Number(),
 							}),
 							transactions: t.Array(
 								t.Object({
 									id: t.String(),
-									amount: t.Number(),
-									issuedAt: t.String(),
-									status: t.Union([
-										t.Literal('ACTIVE'),
-										t.Literal('RETIRED'),
-									]),
-									issuer: t.String(),
+									amount: t.Number(), // Keeping as number as requested
+									issuedAt: t.String(), // Using ISO string format
+									status: t.Enum(CreditIssueRequestStatus),
+									issuer: t.Optional(t.String()),
+									txnHash: t.Optional(t.String()), // Adding txnHash
 								}),
 							),
 						}),
