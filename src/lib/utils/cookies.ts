@@ -4,6 +4,6 @@ import { isProd } from '../env';
 export const defaultCookieOptions: CookieOptions = {
 	httpOnly: true,
 	path: '/',
-	sameSite: 'lax',
+	sameSite: 'none',
 	secure: isProd,
 };
