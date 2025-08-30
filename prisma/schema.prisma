@@ -32,6 +32,13 @@ model User {
   walletAddress    String? @unique
   walletPrivateKey String?
 
+  // assigned auditor for plants and industries
+  assignedAuditor   User?   @relation("AuditorAssignment", fields: [assignedAuditorId], references: [id])
+  assignedAuditorId String?
+
+  // auditor can be assigned to multiple plants/industries
+  assignedUsers User[] @relation("AuditorAssignment")
+
   sessions                   Session[]
   creditIssueRequests        CreditIssueRequest[] @relation(name: "issuedPlant")
   creditIssueRequestsActions CreditIssueRequest[] @relation(name: "issueRequestAuditor")

@@ -12,6 +12,7 @@ import { defaultCookieOptions } from '@/lib/utils/cookies';
 import { Responses } from '@nexusog/golakost';
 import { until } from '@open-draft/until';
 import { UserRole } from '@/generated/prisma';
+import { logger } from '@/lib/logger';
 
 export const usersRoutes = new Elysia({
 	prefix: '/users',
@@ -23,12 +24,20 @@ export const usersRoutes = new Elysia({
 		async (ctx) => {
 			const { body, cookie, status } = ctx;
 
+			logger.info(
+				`Registration attempt for user: ${body.username} with role: ${body.role}`,
+			);
+
 			// Check if username already exists
 			const { data: existingUser, error: findUserError } = await until(
 				() => findUserByUsername(body.username),
 			);
 
 			if (findUserError) {
+				logger.error(
+					`Failed to check existing user: ${findUserError.message}`,
+					{ username: body.username },
+				);
 				return status(StatusCodes.INTERNAL_SERVER_ERROR, {
 					error: true,
 					message: `Failed to check existing user: ${findUserError.message}`,
@@ -36,6 +45,9 @@ export const usersRoutes = new Elysia({
 			}
 
 			if (existingUser) {
+				logger.warn(
+					`Registration failed - username already exists: ${body.username}`,
+				);
 				return status(StatusCodes.CONFLICT, {
 					error: true,
 					message: 'Username already exists',
@@ -53,6 +65,10 @@ export const usersRoutes = new Elysia({
 					'governmentLicenseId' in body
 						? body.governmentLicenseId
 						: undefined,
+				auditorUsername:
+					'auditorUsername' in body
+						? body.auditorUsername
+						: undefined,
 			};
 
 			// Only add renewableEnergyProofId for Plant users
@@ -69,6 +85,13 @@ export const usersRoutes = new Elysia({
 			);
 
 			if (createUserError) {
+				logger.error(
+					`User creation failed: ${createUserError.message}`,
+					{
+						username: body.username,
+						role: body.role,
+					},
+				);
 				return status(StatusCodes.INTERNAL_SERVER_ERROR, {
 					error: true,
 					message: `Failed to create user: ${createUserError.message}`,
@@ -81,6 +104,13 @@ export const usersRoutes = new Elysia({
 			);
 
 			if (sessionError) {
+				logger.error(
+					`Session creation failed: ${sessionError.message}`,
+					{
+						userId: result.user.id,
+						username: body.username,
+					},
+				);
 				return status(StatusCodes.INTERNAL_SERVER_ERROR, {
 					error: true,
 					message: `Failed to create session: ${sessionError.message}`,
@@ -94,6 +124,10 @@ export const usersRoutes = new Elysia({
 				expires: session.expiresAt,
 			});
 
+			logger.success(
+				`User registration completed successfully: ${body.username} (${result.user.id})`,
+			);
+
 			return status(StatusCodes.CREATED, {
 				error: false,
 				message: 'User created successfully',
@@ -105,6 +139,12 @@ export const usersRoutes = new Elysia({
 						companyName: result.user.companyName ?? undefined,
 						walletAddress: result.user.walletAddress ?? '',
 						walletFunded: result.walletFunded ?? false,
+						assignedAuditor: result.user.assignedAuditor
+							? {
+									username:
+										result.user.assignedAuditor.username,
+							  }
+							: undefined,
 					},
 				},
 			});
@@ -121,6 +161,11 @@ export const usersRoutes = new Elysia({
 							companyName: t.Optional(t.String()),
 							walletAddress: t.String(),
 							walletFunded: t.Boolean(),
+							assignedAuditor: t.Optional(
+								t.Object({
+									username: t.String(),
+								}),
+							),
 						}),
 					}),
 				),
@@ -136,12 +181,17 @@ export const usersRoutes = new Elysia({
 		async (ctx) => {
 			const { params, body, cookie, status } = ctx;
 
+			logger.info(`Login attempt for user: ${params.username}`);
+
 			// Authenticate user
 			const { data: user, error: authError } = await until(() =>
 				authenticateUser(params.username, body.password),
 			);
 
 			if (authError) {
+				logger.error(`Authentication error: ${authError.message}`, {
+					username: params.username,
+				});
 				return status(StatusCodes.INTERNAL_SERVER_ERROR, {
 					error: true,
 					message: `Authentication failed: ${authError.message}`,
@@ -149,6 +199,9 @@ export const usersRoutes = new Elysia({
 			}
 
 			if (!user) {
+				logger.warn(
+					`Login failed - invalid credentials for user: ${params.username}`,
+				);
 				return status(StatusCodes.UNAUTHORIZED, {
 					error: true,
 					message: 'Invalid username or password',
@@ -161,6 +214,13 @@ export const usersRoutes = new Elysia({
 			);
 
 			if (sessionError) {
+				logger.error(
+					`Session creation failed during login: ${sessionError.message}`,
+					{
+						userId: user.id,
+						username: params.username,
+					},
+				);
 				return status(StatusCodes.INTERNAL_SERVER_ERROR, {
 					error: true,
 					message: `Failed to create session: ${sessionError.message}`,
@@ -173,6 +233,10 @@ export const usersRoutes = new Elysia({
 				value: session.id,
 				expires: session.expiresAt,
 			});
+
+			logger.success(
+				`Login successful for user: ${params.username} (${user.id})`,
+			);
 
 			return status(StatusCodes.OK, {
 				error: false,

@@ -4,6 +4,9 @@ import { Elysia } from 'elysia';
 import { env } from '@/lib/env';
 import cors from '@elysiajs/cors';
 import { usersRoutes } from './routes/users';
+import { logger } from '@/lib/logger';
+
+logger.info('🚀 Starting HydroChain Backend Server...');
 
 const app = new Elysia({
 	precompile: true,
@@ -23,7 +26,22 @@ const app = new Elysia({
 		}),
 	)
 	.use(usersRoutes)
-	.get('/', () => 'OK', {
-		tags: ['misc'],
-	})
+	.get(
+		'/',
+		() => {
+			logger.debug('Health check endpoint accessed');
+			return 'OK';
+		},
+		{
+			tags: ['misc'],
+		},
+	)
 	.listen(env.PORT);
+
+logger.success(
+	`🌊 HydroChain Backend Server is running on http://localhost:${env.PORT}`,
+);
+logger.info(
+	`📝 API Documentation available at http://localhost:${env.PORT}/swagger`,
+);
+logger.info(`📊 Log Level: ${env.LOG_LEVEL}`);

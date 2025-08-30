@@ -2,6 +2,7 @@ import db from '@/lib/db';
 import { env } from '@/lib/env';
 import { UserRole, type User } from '@/generated/prisma';
 import { Wallet, ethers } from 'ethers';
+import { logger } from '@/lib/logger';
 
 export interface CreateUserData {
 	username: string;
@@ -10,15 +11,34 @@ export interface CreateUserData {
 	companyName?: string;
 	governmentLicenseId?: string;
 	renewableEnergyProofId?: string;
+	auditorUsername?: string;
 }
 
 export interface CreateUserResult {
-	user: User;
+	user: {
+		id: string;
+		role: UserRole;
+		username: string;
+		password: string;
+		companyName: string | null;
+		governmentLicenseId: string | null;
+		renewableEnergyProofId: string | null;
+		walletAddress: string | null;
+		walletPrivateKey: string | null;
+		assignedAuditorId: string | null;
+		createdAt: Date;
+		updatedAt: Date;
+		assignedAuditor?: {
+			id: string;
+			username: string;
+		} | null;
+	};
 	walletFunded?: boolean;
 }
 
 // Hash password using Bun's built-in password hashing
 export async function hashPassword(password: string): Promise<string> {
+	logger.debug('Hashing password for user registration');
 	return await Bun.password.hash(password);
 }
 
@@ -27,12 +47,15 @@ export async function verifyPassword(
 	password: string,
 	hash: string,
 ): Promise<boolean> {
+	logger.debug('Verifying password for user authentication');
 	return await Bun.password.verify(password, hash);
 }
 
 // Generate Ethereum wallet
 export function generateWallet(): { address: string; privateKey: string } {
+	logger.debug('Generating new Ethereum wallet');
 	const wallet = Wallet.createRandom();
+	logger.info(`Generated wallet address: ${wallet.address}`);
 	return {
 		address: wallet.address,
 		privateKey: wallet.privateKey,
@@ -41,6 +64,7 @@ export function generateWallet(): { address: string; privateKey: string } {
 
 // Fund wallet with ETH
 export async function fundWallet(walletAddress: string): Promise<boolean> {
+	logger.info(`Attempting to fund wallet: ${walletAddress}`);
 	try {
 		// Create provider (you'll need to configure this based on your network)
 		const provider = new ethers.JsonRpcProvider(env.ETHER_PROVIDER_URL); // Adjust for your network
@@ -54,14 +78,15 @@ export async function fundWallet(walletAddress: string): Promise<boolean> {
 		// Send 0.01 ETH to the new wallet
 		const tx = await primaryWallet.sendTransaction({
 			to: walletAddress,
-			value: ethers.parseEther('0.01'),
+			value: ethers.parseEther('0.001'),
 		});
 
 		// Wait for transaction confirmation
 		await tx.wait();
+		logger.success(`Successfully funded wallet: ${walletAddress}`);
 		return true;
 	} catch (error) {
-		console.error('Failed to fund wallet:', error);
+		logger.error('Failed to fund wallet:', error);
 		return false;
 	}
 }
@@ -70,16 +95,39 @@ export async function fundWallet(walletAddress: string): Promise<boolean> {
 export async function createUser(
 	userData: CreateUserData,
 ): Promise<CreateUserResult> {
+	logger.info(`Creating user: ${userData.username} with role: ${userData.role}`);
+	
 	const hashedPassword = await hashPassword(userData.password);
 
 	let walletData: { walletAddress?: string; walletPrivateKey?: string } = {};
 	let walletFunded = false;
+	let assignedAuditorId: string | undefined;
 
-	// Generate wallet for Plant and Industry users
+	// For Plant and Industry users, find assigned auditor and generate wallet
 	if (
 		userData.role === UserRole.Plant ||
 		userData.role === UserRole.Industry
 	) {
+		// Find the assigned auditor by username
+		if (userData.auditorUsername) {
+			logger.debug(`Looking for auditor: ${userData.auditorUsername}`);
+			const auditor = await db.user.findUnique({
+				where: { 
+					username: userData.auditorUsername,
+					role: UserRole.Auditor 
+				},
+			});
+
+			if (!auditor) {
+				logger.error(`Auditor not found: ${userData.auditorUsername}`);
+				throw new Error(`Auditor with username '${userData.auditorUsername}' not found`);
+			}
+
+			assignedAuditorId = auditor.id;
+			logger.info(`Assigned auditor: ${userData.auditorUsername} (${auditor.id})`);
+		}
+
+		// Generate wallet
 		const wallet = generateWallet();
 		walletData = {
 			walletAddress: wallet.address,
@@ -98,10 +146,20 @@ export async function createUser(
 			companyName: userData.companyName,
 			governmentLicenseId: userData.governmentLicenseId,
 			renewableEnergyProofId: userData.renewableEnergyProofId,
+			assignedAuditorId,
 			...walletData,
 		},
+		include: {
+			assignedAuditor: {
+				select: {
+					id: true,
+					username: true,
+				}
+			}
+		}
 	});
 
+	logger.success(`User created successfully: ${user.username} (${user.id})`);
 	return { user, walletFunded };
 }
 
@@ -109,9 +167,26 @@ export async function createUser(
 export async function findUserByUsername(
 	username: string,
 ): Promise<User | null> {
-	return await db.user.findUnique({
+	logger.debug(`Looking up user by username: ${username}`);
+	const user = await db.user.findUnique({
 		where: { username },
+		include: {
+			assignedAuditor: {
+				select: {
+					id: true,
+					username: true,
+				}
+			}
+		}
 	});
+	
+	if (user) {
+		logger.debug(`User found: ${username} (${user.id})`);
+	} else {
+		logger.debug(`User not found: ${username}`);
+	}
+	
+	return user;
 }
 
 // Authenticate user
@@ -119,9 +194,19 @@ export async function authenticateUser(
 	username: string,
 	password: string,
 ): Promise<User | null> {
+	logger.info(`Authentication attempt for user: ${username}`);
 	const user = await findUserByUsername(username);
-	if (!user) return null;
+	if (!user) {
+		logger.warn(`Authentication failed - user not found: ${username}`);
+		return null;
+	}
 
 	const isValid = await verifyPassword(password, user.password);
-	return isValid ? user : null;
+	if (isValid) {
+		logger.success(`Authentication successful for user: ${username}`);
+		return user;
+	} else {
+		logger.warn(`Authentication failed - invalid password for user: ${username}`);
+		return null;
+	}
 }

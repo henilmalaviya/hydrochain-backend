@@ -1,11 +1,13 @@
 import db from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 export function createSession(userId: string, expiresAt?: Date) {
+	logger.debug(`Creating session for user: ${userId}`);
 	// Default expiry: 30 days from now
 	const defaultExpiry = new Date();
 	defaultExpiry.setDate(defaultExpiry.getDate() + 30);
 
-	return db.session.create({
+	const sessionData = db.session.create({
 		data: {
 			user: {
 				connect: {
@@ -15,9 +17,13 @@ export function createSession(userId: string, expiresAt?: Date) {
 			expiresAt: expiresAt ?? defaultExpiry,
 		},
 	});
+
+	logger.info(`Session created for user: ${userId}`);
+	return sessionData;
 }
 
 export function getSession(sessionId: string) {
+	logger.debug(`Retrieving session: ${sessionId}`);
 	return db.session.findUnique({
 		where: {
 			id: sessionId,
@@ -29,6 +35,7 @@ export function getSession(sessionId: string) {
 }
 
 export function deleteSession(sessionId: string) {
+	logger.info(`Deleting session: ${sessionId}`);
 	return db.session.delete({
 		where: {
 			id: sessionId,
@@ -37,5 +44,7 @@ export function deleteSession(sessionId: string) {
 }
 
 export function isSessionValid(session: { expiresAt: Date }): boolean {
-	return new Date() < session.expiresAt;
+	const isValid = new Date() < session.expiresAt;
+	logger.debug(`Session validity check: ${isValid}`);
+	return isValid;
 }

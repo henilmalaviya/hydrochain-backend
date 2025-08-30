@@ -20,6 +20,7 @@ export const PlantUserRegistrationSchema = t.Intersect([
 		companyName: t.String({ minLength: 1 }),
 		renewableEnergyProofId: t.String({ minLength: 1 }),
 		governmentLicenseId: t.String({ minLength: 1 }),
+		auditorUsername: t.String({ minLength: 1 }),
 	}),
 ]);
 
@@ -30,22 +31,14 @@ export const IndustryUserRegistrationSchema = t.Intersect([
 		role: t.Literal(UserRole.Industry),
 		companyName: t.String({ minLength: 1 }),
 		governmentLicenseId: t.String({ minLength: 1 }),
+		auditorUsername: t.String({ minLength: 1 }),
 	}),
 ]);
 
-// Auditor user registration schema
-export const AuditorUserRegistrationSchema = t.Intersect([
-	BaseUserRegistrationSchema,
-	t.Object({
-		role: t.Literal(UserRole.Auditor),
-	}),
-]);
-
-// Union schema for registration
+// Union schema for registration (removed Auditor - manual creation only)
 export const UserRegistrationSchema = t.Union([
 	PlantUserRegistrationSchema,
 	IndustryUserRegistrationSchema,
-	AuditorUserRegistrationSchema,
 ]);
 
 // Login schema
