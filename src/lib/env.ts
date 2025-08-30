@@ -22,6 +22,7 @@ export const env = createEnv({
 
 		PRIMARY_ETH_ACCOUNT_PRIVATE_KEY: z.string(),
 		ETHER_PROVIDER_URL: z.string(),
+		CONTRACT_ADDRESS: z.string(),
 	},
 	isServer: true,
 	runtimeEnv: Bun.env,

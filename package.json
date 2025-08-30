@@ -5,7 +5,7 @@
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"dev": "NODE_ENV=development bun run --watch src/index.ts",
 		"start": "NODE_ENV=production bun run src/index.ts",
-		"prepare": "bunx prisma generate"
+		"prepare": "bunx prisma migrate deploy && cd contracts && bunx solcjs --bin --abi HydrogenCredit.sol"
 	},
 	"dependencies": {
 		"@elysiajs/cors": "^1.3.3",

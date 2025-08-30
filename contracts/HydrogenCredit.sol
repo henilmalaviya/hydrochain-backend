@@ -27,14 +27,14 @@ contract HydrogenCredit {
 	);
 	event CreditRetired(string indexed id, address indexed holder);
 
-	function issueCredit(string memory id, uint256 amount) public {
+	function issueCredit(string memory id, address to, uint256 amount) public {
 		require(!creditExists[id], 'Credit ID already exists');
 
 		credits.push(
 			Credit({
 				id: id,
 				issuer: msg.sender,
-				holder: msg.sender,
+				holder: to,
 				amount: amount,
 				timestamp: block.timestamp,
 				retired: false

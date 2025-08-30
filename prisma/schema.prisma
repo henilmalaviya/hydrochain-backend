@@ -75,6 +75,8 @@ model CreditIssueRequest {
   user   User   @relation(name: "issuedPlant", fields: [userId], references: [id])
   userId String
 
+  amount Float
+
   status CreditIssueRequestStatus @default(PENDING)
 
   actionBy   User?   @relation(name: "issueRequestAuditor", fields: [actionById], references: [id])
@@ -96,6 +98,8 @@ model CreditBuyRequest {
   from   User   @relation(name: "creditSellingPlant", fields: [fromId], references: [id])
   fromId String
 
+  creditId String
+
   to   User   @relation(name: "creditBuyerPlant", fields: [toId], references: [id])
   toId String
 
@@ -113,6 +117,8 @@ model CreditRetireRequest {
 
   user   User   @relation(name: "retiringIndustry", fields: [userId], references: [id])
   userId String
+
+  creditId String
 
   status CreditRetireRequestStatus @default(PENDING)
 
