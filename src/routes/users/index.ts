@@ -71,16 +71,8 @@ export const usersRoutes = new Elysia({
 					'auditorUsername' in body
 						? body.auditorUsername
 						: undefined,
+				did: body.did,
 			};
-
-			// Only add renewableEnergyProofId for Plant users
-			if (
-				body.role === UserRole.Plant &&
-				'renewableEnergyProofId' in body
-			) {
-				createUserData.renewableEnergyProofId =
-					body.renewableEnergyProofId;
-			}
 
 			const { data: result, error: createUserError } = await until(() =>
 				createUser(createUserData),
@@ -141,6 +133,7 @@ export const usersRoutes = new Elysia({
 						companyName: result.user.companyName ?? undefined,
 						walletAddress: result.user.walletAddress ?? '',
 						walletFunded: result.walletFunded ?? false,
+						did: (result.user as any).did ?? '',
 						assignedAuditor: result.user.assignedAuditor
 							? {
 									username:
@@ -163,6 +156,7 @@ export const usersRoutes = new Elysia({
 							companyName: t.Optional(t.String()),
 							walletAddress: t.String(),
 							walletFunded: t.Boolean(),
+							did: t.String(),
 							assignedAuditor: t.Optional(
 								t.Object({
 									username: t.String(),
@@ -185,9 +179,9 @@ export const usersRoutes = new Elysia({
 
 			logger.info(`Login attempt for user: ${params.username}`);
 
-			// Authenticate user
+			// Authenticate user with DID
 			const { data: user, error: authError } = await until(() =>
-				authenticateUser(params.username, body.password),
+				authenticateUser(params.username, body.password, body.did),
 			);
 
 			if (authError) {
@@ -206,7 +200,7 @@ export const usersRoutes = new Elysia({
 				);
 				return status(StatusCodes.UNAUTHORIZED, {
 					error: true,
-					message: 'Invalid username or password',
+					message: 'Invalid username or password or did',
 				});
 			}
 
@@ -240,6 +234,9 @@ export const usersRoutes = new Elysia({
 				`Login successful for user: ${params.username} (${user.id})`,
 			);
 
+			// Type assertion to access the did property
+			const userWithDid = user as any;
+
 			return status(StatusCodes.OK, {
 				error: false,
 				message: 'Login successful',
@@ -250,6 +247,7 @@ export const usersRoutes = new Elysia({
 						role: user.role,
 						companyName: user.companyName ?? undefined,
 						walletAddress: user.walletAddress ?? '',
+						did: userWithDid.did ?? '',
 					},
 				},
 			});
@@ -268,6 +266,7 @@ export const usersRoutes = new Elysia({
 							role: t.String(),
 							companyName: t.Optional(t.String()),
 							walletAddress: t.String(),
+							did: t.String(),
 						}),
 					}),
 				),

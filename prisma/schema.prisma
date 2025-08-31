@@ -24,9 +24,7 @@ model User {
 
   companyName         String?
   governmentLicenseId String?
-
-  // plant
-  renewableEnergyProofId String?
+  did                 String?
 
   // wallet (plant, industry)
   walletAddress    String? @unique
