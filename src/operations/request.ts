@@ -353,6 +353,8 @@ export async function createRetireRequest(
 	userId: string,
 	metadata?: string,
 ) {
+	const anomaly = detectRetireAnomaly(metadata);
+
 	return db.creditRetireRequest.create({
 		data: {
 			creditId: creditId,
@@ -362,6 +364,7 @@ export async function createRetireRequest(
 				},
 			},
 			metadata,
+			anomaly,
 		},
 	});
 }
