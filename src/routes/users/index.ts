@@ -288,21 +288,6 @@ export const usersRoutes = new Elysia({
 					`Fetching transaction history for user: ${username}`,
 				);
 
-				// Check if user is accessing their own data or is an Auditor
-				if (
-					user.username !== username &&
-					user.role !== UserRole.Auditor
-				) {
-					logger.warn(
-						`Unauthorized access attempt: ${user.username} tried to access ${username}'s transaction history`,
-					);
-					return status(StatusCodes.FORBIDDEN, {
-						error: true,
-						message:
-							'You can only access your own transaction history',
-					});
-				}
-
 				const { data, error } = await until(() =>
 					getUserTransactions(username),
 				);
@@ -350,13 +335,22 @@ export const usersRoutes = new Elysia({
 								totalAmount: t.Number(),
 								activeAmount: t.Number(),
 								pendingAmount: t.Number(),
+								retiredAmount: t.Number(),
 								lifeTimeGeneratedCredits: t.Optional(
 									t.Number(),
 								),
 								lifeTimeTransferredCredits: t.Optional(
 									t.Number(),
 								),
+								lifeTimeRetiredCredits: t.Optional(t.Number()),
+								lifeTimeBoughtCredits: t.Optional(t.Number()),
 							}),
+							credits: t.Array(
+								t.Object({
+									id: t.String(),
+									amount: t.Number(),
+								}),
+							),
 							transactions: t.Array(
 								t.Object({
 									id: t.String(),

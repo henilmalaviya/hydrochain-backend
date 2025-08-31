@@ -1,10 +1,11 @@
-import { UserRole } from '@/generated/prisma';
+import { CreditBuyRequestStatus, UserRole } from '@/generated/prisma';
 import { executeTransaction } from '@/lib/blockchain/hydrogenCreditContract';
 import { authMiddleware } from '@/middlewares/auth';
 import {
 	acceptCreditBuyRequest,
 	createCreditBuyRequest,
 	getCreditBuyRequestById,
+	getCreditBuyRequestsAsAuditor,
 	rejectCreditBuyRequest,
 } from '@/operations/request';
 import { Responses } from '@nexusog/golakost';
@@ -25,7 +26,11 @@ export const buyRoutes = new Elysia({
 					const { user, status, body } = ctx;
 
 					const { data, error } = await until(() =>
-						createCreditBuyRequest(user.id, body.creditId),
+						createCreditBuyRequest(
+							user.id,
+							body.creditId,
+							body.metadata,
+						),
 					);
 
 					if (error) {
@@ -40,18 +45,21 @@ export const buyRoutes = new Elysia({
 						message: 'Credit issue request created successfully',
 						data: {
 							reqId: data.id,
+							metadata: body.metadata,
 						},
 					});
 				},
 				{
 					body: t.Object({
 						creditId: t.String(),
+						metadata: t.Optional(t.String()),
 					}),
 					response: {
 						[StatusCodes.CREATED]:
 							Responses.ConstructSuccessResponseSchema(
 								t.Object({
 									reqId: t.String(),
+									metadata: t.Optional(t.String()),
 								}),
 							),
 						[StatusCodes.INTERNAL_SERVER_ERROR]:
@@ -62,11 +70,11 @@ export const buyRoutes = new Elysia({
 	)
 	.guard((app) =>
 		app
-			.use(authMiddleware([UserRole.Plant]))
+			.use(authMiddleware([UserRole.Auditor]))
 			.post(
 				'/:reqId/accept',
 				async (ctx) => {
-					const { user, status, params } = ctx;
+					const { status, params, user } = ctx;
 
 					// check if the request is valid
 					const { data: request, error: requestError } = await until(
@@ -87,7 +95,7 @@ export const buyRoutes = new Elysia({
 						});
 					}
 
-					if (request.fromId !== user.id) {
+					if (user.id !== request.from.assignedAuditorId) {
 						return status(StatusCodes.FORBIDDEN, {
 							error: true,
 							message:
@@ -99,8 +107,8 @@ export const buyRoutes = new Elysia({
 					const { data: txData, error: txError } = await until(() =>
 						executeTransaction(
 							request.creditId,
-							user.walletAddress!,
-							user.walletPrivateKey!,
+							request.from.walletAddress!,
+							request.from.walletPrivateKey!,
 						),
 					);
 
@@ -176,11 +184,11 @@ export const buyRoutes = new Elysia({
 						});
 					}
 
-					if (request.fromId !== user.id) {
+					if (user.id !== request.from.assignedAuditorId) {
 						return status(StatusCodes.FORBIDDEN, {
 							error: true,
 							message:
-								'You are not authorized to reject this request',
+								'You are not authorized to accept this request',
 						});
 					}
 
@@ -223,4 +231,68 @@ export const buyRoutes = new Elysia({
 					},
 				},
 			),
+	)
+	.guard((app) =>
+		app.use(authMiddleware([UserRole.Auditor])).get(
+			'',
+			async (ctx) => {
+				const { user, status } = ctx;
+
+				const { data, error } = await until(() =>
+					getCreditBuyRequestsAsAuditor(user.id),
+				);
+
+				if (error) {
+					return status(StatusCodes.INTERNAL_SERVER_ERROR, {
+						error: true,
+						message: `Failed to get credit buy requests: ${error.message}`,
+					});
+				}
+
+				return status(StatusCodes.OK, {
+					error: false,
+					message: 'Credit buy requests retrieved successfully',
+					data: data.map((req) => ({
+						id: req.id,
+						creditId: req.creditId,
+						from: {
+							username: req.from.username,
+							companyName: req.from.companyName!,
+						},
+						to: {
+							username: req.to.username,
+							companyName: req.to.companyName!,
+						},
+						status: req.status,
+						txnHash: req.txnHash,
+						metadata: req.metadata,
+					})),
+				});
+			},
+			{
+				response: {
+					[StatusCodes.OK]: Responses.ConstructSuccessResponseSchema(
+						t.Array(
+							t.Object({
+								id: t.String(),
+								creditId: t.String(),
+								from: t.Object({
+									username: t.String(),
+									companyName: t.String(),
+								}),
+								to: t.Object({
+									username: t.String(),
+									companyName: t.String(),
+								}),
+								status: t.Enum(CreditBuyRequestStatus),
+								txnHash: t.Nullable(t.String()),
+								metadata: t.Nullable(t.String()),
+							}),
+						),
+					),
+					[StatusCodes.INTERNAL_SERVER_ERROR]:
+						Responses.ErrorResponseSchema,
+				},
+			},
+		),
 	);

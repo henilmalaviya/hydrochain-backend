@@ -46,6 +46,8 @@ export async function getUserTransactions(username: string) {
 			walletAddress: true,
 			lifeTimeGeneratedCredits: true,
 			lifeTimeTransferredCredits: true,
+			lifeTimeRetiredCredits: true,
+			lifeTimeBoughtCredits: true,
 		},
 	});
 
@@ -78,6 +80,18 @@ export async function getUserTransactions(username: string) {
 			createdAt: 'desc',
 		},
 	});
+
+	// Get retired credit requests to exclude from active credits
+	const retiredCreditRequests = await db.creditRetireRequest.findMany({
+		where: {
+			status: 'RETIRED',
+		},
+	});
+
+	// Create a set of retired credit IDs for quick lookup
+	const retiredCreditIds = new Set(
+		retiredCreditRequests.map((req) => req.creditId),
+	);
 
 	// Get credit buy requests where user is sender (fromId - Plant)
 	const outgoingCreditTransfers = await db.creditBuyRequest.findMany({
@@ -156,6 +170,7 @@ export async function getUserTransactions(username: string) {
 	let totalAmount = 0;
 	let activeAmount = 0;
 	let pendingAmount = 0;
+	let retiredAmount = 0;
 
 	if (user.role === UserRole.Plant) {
 		// For Plant users - Track which credits have been transferred
@@ -166,12 +181,17 @@ export async function getUserTransactions(username: string) {
 		// Calculate active and pending credits
 		for (const request of creditIssueRequests) {
 			const isTransferred = transferredCreditIds.includes(request.id);
+			const isRetired = retiredCreditIds.has(request.id);
 
 			if (request.status === 'ISSUED') {
-				// Only include non-transferred credits in the active count
-				if (!isTransferred) {
+				if (isRetired) {
+					retiredAmount += request.amount;
+					// Retired credits are still part of total but not active
+					totalAmount += request.amount;
+				} else if (!isTransferred) {
+					// Only include non-transferred and non-retired credits in the active count
 					activeAmount += request.amount;
-					totalAmount += request.amount; // Only add to total if still owned
+					totalAmount += request.amount;
 				}
 			} else if (request.status === 'PENDING') {
 				pendingAmount += request.amount;
@@ -188,7 +208,14 @@ export async function getUserTransactions(username: string) {
 			);
 
 			if (credit && credit.amount > 0) {
-				activeAmount += credit.amount;
+				const isRetired = retiredCreditIds.has(credit.id);
+
+				if (isRetired) {
+					retiredAmount += credit.amount;
+				} else {
+					activeAmount += credit.amount;
+				}
+
 				totalAmount += credit.amount;
 			}
 		}
@@ -279,6 +306,52 @@ export async function getUserTransactions(username: string) {
 			);
 		});
 
+	// Function to get active credits the user currently holds
+	function getActiveCredits() {
+		let activeCredits: { id: string; amount: number }[] = [];
+
+		if (user && user.role === UserRole.Plant) {
+			// For Plant users - include all issued credits that haven't been transferred
+			const transferredCreditIds = outgoingCreditTransfers.map(
+				(t) => t.creditId,
+			);
+
+			activeCredits = creditIssueRequests
+				.filter(
+					(req) =>
+						req.status === 'ISSUED' &&
+						!transferredCreditIds.includes(req.id) &&
+						!retiredCreditIds.has(req.id), // Exclude retired credits
+				)
+				.map((req) => ({
+					id: req.id,
+					amount: req.amount,
+				}));
+		} else if (user && user.role === UserRole.Industry) {
+			// For Industry users - include credits received via transfers that haven't been retired
+			activeCredits = incomingCreditTransfers
+				.map((transfer) => {
+					const credit = transferCredits.find(
+						(c) => c.id === transfer.creditId,
+					);
+					if (credit && !retiredCreditIds.has(credit.id)) {
+						// Exclude retired credits
+						return {
+							id: credit.id,
+							amount: credit.amount,
+						};
+					}
+					return null;
+				})
+				.filter(
+					(credit): credit is { id: string; amount: number } =>
+						credit !== null,
+				);
+		}
+
+		return activeCredits;
+	}
+
 	return {
 		user: {
 			id: user.id,
@@ -291,6 +364,7 @@ export async function getUserTransactions(username: string) {
 			totalAmount,
 			activeAmount,
 			pendingAmount,
+			retiredAmount,
 			lifeTimeGeneratedCredits:
 				user.role === UserRole.Plant
 					? user.lifeTimeGeneratedCredits
@@ -299,7 +373,24 @@ export async function getUserTransactions(username: string) {
 				user.role === UserRole.Plant
 					? user.lifeTimeTransferredCredits
 					: undefined,
+			lifeTimeRetiredCredits:
+				user.role === UserRole.Industry
+					? user.lifeTimeRetiredCredits
+					: undefined,
+			lifeTimeBoughtCredits:
+				user.role === UserRole.Industry
+					? user.lifeTimeBoughtCredits
+					: undefined,
 		},
+		credits: getActiveCredits(),
 		transactions,
 	};
+}
+
+export async function getUserByWalletAddress(walletAddress: string) {
+	return db.user.findUnique({
+		where: {
+			walletAddress: walletAddress,
+		},
+	});
 }

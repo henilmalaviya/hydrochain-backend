@@ -1,11 +1,11 @@
-import { UserRole } from '@/generated/prisma';
+import { CreditIssueRequestStatus, UserRole } from '@/generated/prisma';
 import { issueCreditOnBlockchain } from '@/lib/blockchain/hydrogenCreditContract';
 import { authMiddleware } from '@/middlewares/auth';
 import {
 	acceptCreditIssueRequest,
 	createCreditIssueRequest,
 	getCreditIssueRequestById,
-	getPendingCreditIssueRequests,
+	getCreditIssueRequestsAsAuditor,
 	rejectCreditIssueRequest,
 } from '@/operations/request';
 import { Responses } from '@nexusog/golakost';
@@ -229,16 +229,20 @@ export const issuesRoutes = new Elysia({
 							Responses.ErrorResponseSchema,
 					},
 				},
-			)
+			),
+	)
+	.guard((app) =>
+		app
+			.use(authMiddleware([UserRole.Auditor]))
 			// GET /request/issues
-			// return all the pending issue requests assigned to the auditor
+			// return all issue requests assigned related to the requester
 			.get(
 				'',
 				async (ctx) => {
 					const { user, status } = ctx;
 
 					const { data, error } = await until(() =>
-						getPendingCreditIssueRequests(user.id),
+						getCreditIssueRequestsAsAuditor(user.id),
 					);
 
 					if (error) {
@@ -261,6 +265,9 @@ export const issuesRoutes = new Elysia({
 							},
 							amount: req.amount,
 							metadata: req.metadata?.toString(),
+							status: req.status,
+							txnHash: req.txnHash,
+							createdAt: req.createdAt,
 						})),
 					});
 				},
@@ -277,6 +284,11 @@ export const issuesRoutes = new Elysia({
 										}),
 										amount: t.Number(),
 										metadata: t.Optional(t.String()),
+										status: t.Enum(
+											CreditIssueRequestStatus,
+										),
+										txnHash: t.Nullable(t.String()),
+										createdAt: t.Date(),
 									}),
 								),
 							),

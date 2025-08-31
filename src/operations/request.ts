@@ -127,12 +127,17 @@ export async function rejectCreditIssueRequest(
  * @param creditId - The ID of the credit to be transferred
  * @returns The created buy request object
  */
-export async function createCreditBuyRequest(toId: string, creditId: string) {
+export async function createCreditBuyRequest(
+	toId: string,
+	creditId: string,
+	metadata?: string,
+) {
 	// Verify that the credit exists, is ISSUED, and hasn't already been transferred
 	const creditRequest = await db.creditIssueRequest.findFirst({
 		where: {
 			id: creditId,
 			status: CreditIssueRequestStatus.ISSUED,
+			metadata: metadata,
 		},
 		include: {
 			user: true,
@@ -218,6 +223,16 @@ export async function acceptCreditBuyRequest(
 				},
 			},
 		}),
+		db.user.update({
+			where: {
+				id: buyRequest.toId,
+			},
+			data: {
+				lifeTimeBoughtCredits: {
+					increment: credit.amount,
+				},
+			},
+		}),
 	]);
 }
 
@@ -233,7 +248,11 @@ export async function rejectCreditBuyRequest(buyRequestId: string) {
 	});
 }
 
-export async function createRetireRequest(creditId: string, userId: string) {
+export async function createRetireRequest(
+	creditId: string,
+	userId: string,
+	metadata?: string,
+) {
 	return db.creditRetireRequest.create({
 		data: {
 			creditId: creditId,
@@ -242,6 +261,7 @@ export async function createRetireRequest(creditId: string, userId: string) {
 					id: userId,
 				},
 			},
+			metadata,
 		},
 	});
 }
@@ -257,7 +277,106 @@ export async function getRetireRequestById(creditId: string) {
 	});
 }
 
-export async function getPendingCreditIssueRequests(userId: string) {
+export async function getRetireRequestByReqId(reqId: string) {
+	return db.creditRetireRequest.findUnique({
+		where: {
+			id: reqId,
+		},
+		include: {
+			user: true,
+			actionBy: true,
+		},
+	});
+}
+
+export async function acceptRetireRequest(
+	auditorId: string,
+	reqId: string,
+	txnHash: string,
+) {
+	// Get the retire request to access the associated credit and user
+	const retireRequest = await db.creditRetireRequest.findUnique({
+		where: {
+			id: reqId,
+		},
+		include: {
+			user: true,
+		},
+	});
+
+	if (!retireRequest) {
+		throw new Error('Retire request not found');
+	}
+
+	// Find the credit issue request to get the amount
+	const creditRequest = await db.creditIssueRequest.findUnique({
+		where: {
+			id: retireRequest.creditId,
+		},
+	});
+
+	if (!creditRequest) {
+		throw new Error('Credit not found');
+	}
+
+	// Update the CreditRetireRequest in the database with RETIRED status
+	return db.$transaction([
+		db.creditRetireRequest.update({
+			where: {
+				id: reqId,
+			},
+			data: {
+				status: 'RETIRED',
+				txnHash: txnHash,
+				actionBy: {
+					connect: {
+						id: auditorId,
+					},
+				},
+			},
+		}),
+		db.user.update({
+			where: {
+				id: retireRequest.userId,
+			},
+			data: {
+				lifeTimeRetiredCredits: {
+					increment: creditRequest.amount,
+				},
+			},
+		}),
+	]);
+}
+
+export async function rejectRetireRequest(auditorId: string, reqId: string) {
+	// Get the retire request to verify it exists
+	const retireRequest = await db.creditRetireRequest.findUnique({
+		where: {
+			id: reqId,
+		},
+	});
+
+	if (!retireRequest) {
+		throw new Error('Retire request not found');
+	}
+
+	// Update the CreditRetireRequest in the database with REJECTED status
+	return db.creditRetireRequest.update({
+		where: {
+			id: reqId,
+		},
+		data: {
+			status: 'REJECTED',
+			actionBy: {
+				connect: {
+					id: auditorId,
+				},
+			},
+		},
+	});
+}
+
+export async function getCreditIssueRequestsAsAuditor(userId: string) {
 	return db.creditIssueRequest.findMany({
 		where: {
 			user: {
@@ -265,10 +384,46 @@ export async function getPendingCreditIssueRequests(userId: string) {
 					id: userId,
 				},
 			},
-			status: CreditIssueRequestStatus.PENDING,
 		},
 		include: {
 			user: true,
+		},
+		orderBy: {
+			createdAt: 'desc',
+		},
+	});
+}
+
+export async function getCreditBuyRequestsAsAuditor(userId: string) {
+	return db.creditBuyRequest.findMany({
+		where: {
+			from: {
+				assignedAuditor: {
+					id: userId,
+				},
+			},
+		},
+		include: {
+			from: true,
+			to: true,
+		},
+	});
+}
+
+export async function getRetireRequestsAsAuditor(userId: string) {
+	return db.creditRetireRequest.findMany({
+		where: {
+			user: {
+				assignedAuditor: {
+					id: userId,
+				},
+			},
+		},
+		include: {
+			user: true,
+		},
+		orderBy: {
+			createdAt: 'desc',
 		},
 	});
 }
