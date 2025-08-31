@@ -362,6 +362,7 @@ export const usersRoutes = new Elysia({
 									recipient: t.Optional(t.String()),
 									txnHash: t.Optional(t.String()),
 									type: t.String(), // ISSUE, TRANSFER_IN, TRANSFER_OUT
+									anomaly: t.Boolean(),
 								}),
 							),
 						}),

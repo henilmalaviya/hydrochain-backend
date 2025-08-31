@@ -234,6 +234,7 @@ export async function getUserTransactions(username: string) {
 			issuer: request.actionBy ? request.actionBy.username : undefined,
 			txnHash: request.txnHash || undefined,
 			type: 'ISSUE',
+			anomaly: request.anomaly || false,
 		};
 	});
 
@@ -249,6 +250,7 @@ export async function getUserTransactions(username: string) {
 			recipient: transfer.to.username,
 			txnHash: transfer.txnHash || undefined,
 			type: 'TRANSFER_OUT',
+			anomaly: transfer.anomaly || false,
 		};
 	});
 
@@ -264,6 +266,7 @@ export async function getUserTransactions(username: string) {
 			sender: transfer.from.username,
 			txnHash: transfer.txnHash || undefined,
 			type: 'TRANSFER_IN',
+			anomaly: transfer.anomaly || false,
 		};
 	});
 
