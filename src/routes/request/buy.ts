@@ -36,13 +36,13 @@ export const buyRoutes = new Elysia({
 					if (error) {
 						return status(StatusCodes.INTERNAL_SERVER_ERROR, {
 							error: true,
-							message: `Failed to create credit issue request: ${error.message}`,
+							message: `Failed to create credit buy request: ${error.message}`,
 						});
 					}
 
 					return status(StatusCodes.CREATED, {
 						error: false,
-						message: 'Credit issue request created successfully',
+						message: 'Credit buy request created successfully',
 						data: {
 							reqId: data.id,
 							metadata: body.metadata,

@@ -214,8 +214,6 @@ export async function createCreditBuyRequest(
 		where: {
 			id: creditId,
 			status: CreditIssueRequestStatus.ISSUED,
-			metadata: metadata,
-			anomaly,
 		},
 		include: {
 			user: true,
@@ -251,6 +249,8 @@ export async function createCreditBuyRequest(
 				},
 			},
 			creditId,
+			anomaly,
+			metadata,
 		},
 	});
 }
