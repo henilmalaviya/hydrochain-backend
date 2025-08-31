@@ -13,6 +13,43 @@ HydroChain Backend is a platform that enables:
 
 The system uses a Solidity smart contract for the blockchain component and a Bun/Elysia.js backend with PostgreSQL database.
 
+## Technical Architecture
+
+### System Components
+
+1. **REST API Layer** - Built with Elysia.js, providing endpoints for user management and credit operations
+2. **Database Layer** - PostgreSQL with Prisma ORM for data persistence
+3. **Blockchain Layer** - Ethereum smart contract for immutable record-keeping and credit transactions
+4. **Authentication System** - Session-based authentication with cookie management
+5. **Role-Based Access Control** - Different permissions for Plant, Industry, and Auditor users
+
+### Core Technologies
+
+-   **Bun** - JavaScript runtime and package manager
+-   **Elysia.js** - TypeScript web framework optimized for Bun
+-   **Prisma** - ORM for database access and migrations
+-   **Ethers.js** - Ethereum blockchain interaction library
+-   **PostgreSQL** - Primary database for storing user data and transaction records
+
+### Data Flow Architecture
+
+```
+┌──────────────┐      ┌──────────────┐      ┌───────────────┐
+│              │      │              │      │               │
+│   Client     │──────►   REST API   │──────►   Database    │
+│  Application │◄──────│  (Elysia.js) │◄──────│   (PostgreSQL) │
+│              │      │              │      │               │
+└──────────────┘      └───────┬──────┘      └───────────────┘
+                             │
+                             │
+                      ┌──────▼──────┐
+                      │              │
+                      │  Ethereum    │
+                      │ Smart Contract│
+                      │              │
+                      └──────────────┘
+```
+
 ## Prerequisites
 
 -   [Bun](https://bun.sh/) >= 1.0.0
@@ -96,34 +133,160 @@ bun run dev
 bun run start
 ```
 
-## API Routes
-
-The API provides endpoints for:
-
--   `/users` - User management
--   `/me` - Current user information
--   `/request/issue` - Issue hydrogen credits
--   `/request/buy` - Buy/transfer hydrogen credits
--   `/request` - General request operations
-
-## Database Schema
+## Database Schema Details
 
 The application uses Prisma with PostgreSQL and includes the following models:
 
--   User (Plant, Industry, Auditor roles)
--   Session
--   CreditIssueRequest
--   CreditBuyRequest
--   CreditRetireRequest
+### User Model
 
-## Smart Contract
+```prisma
+model User {
+  id String @id @default(uuid())
+  role UserRole
+  username String @unique
+  password String
+  companyName String?
+  governmentLicenseId String?
+  did String?
+  walletAddress String? @unique
+  walletPrivateKey String?
+  assignedAuditor User? @relation("AuditorAssignment", fields: [assignedAuditorId], references: [id])
+  assignedAuditorId String?
+  assignedUsers User[] @relation("AuditorAssignment")
+  lifeTimeGeneratedCredits Float @default(0)
+  lifeTimeTransferredCredits Float @default(0)
+  lifeTimeRetiredCredits Float @default(0)
+  lifeTimeBoughtCredits Float @default(0)
+  // Relations
+  sessions Session[]
+  creditIssueRequests CreditIssueRequest[] @relation(name: "issuedPlant")
+  creditIssueRequestsActions CreditIssueRequest[] @relation(name: "issueRequestAuditor")
+  creditBuyRequests CreditBuyRequest[] @relation(name: "creditBuyerPlant")
+  CreditBuyRequest CreditBuyRequest[] @relation(name: "creditSellingPlant")
+  creditRetireRequests CreditRetireRequest[] @relation(name: "retiringIndustry")
+  creditRetireRequestsActions CreditRetireRequest[] @relation(name: "retireRequestAuditor")
+}
+```
 
-The `HydrogenCredit.sol` contract provides functions for:
+### Credit Request Models
 
--   Issuing new credits
--   Transferring credits between addresses
--   Retiring credits
--   Querying credit information
+The system uses three types of request models to handle the lifecycle of credits:
+
+1. **CreditIssueRequest** - For plants to request new credit issuance
+2. **CreditBuyRequest** - For industries to purchase credits from plants
+3. **CreditRetireRequest** - For industries to retire credits after use
+
+Each request goes through an approval workflow with an assigned auditor.
+
+## Smart Contract Details
+
+The `HydrogenCredit.sol` contract is the blockchain component that manages the immutable credit records:
+
+```solidity
+contract HydrogenCredit {
+    struct Credit {
+        string id;
+        address issuer;
+        address holder;
+        uint256 amount;
+        uint256 timestamp;
+        bool retired;
+    }
+
+    // Core functions
+    function issueCredit(string memory id, address to, uint256 amount) public {...}
+    function transferCredit(string memory creditId, address to) public {...}
+    function retireCredit(string memory creditId) public {...}
+    function getCredit(string memory creditId) public view returns (Credit memory) {...}
+    function getAllCredits() public view returns (Credit[] memory) {...}
+}
+```
+
+## Core System Flows
+
+### 1. User Registration Flow
+
+1. Client sends registration request with username, password, role, and other details
+2. System validates if username exists
+3. For Plant/Industry users:
+    - Generates Ethereum wallet (address and private key)
+    - Links to an assigned auditor
+4. Creates database record
+5. Returns confirmation with session token
+
+### 2. Credit Issuance Flow
+
+1. Plant initiates credit issuance request with amount and metadata
+2. Request is stored with PENDING status
+3. Assigned auditor reviews request
+4. If approved:
+    - Smart contract issues credit tokens
+    - Transaction hash is recorded
+    - Request status changes to ISSUED
+    - Plant's lifetime generated credits are updated
+5. If rejected, status changes to REJECTED
+
+### 3. Credit Transfer Flow
+
+1. Industry submits buy request for specific credit ID
+2. Request is stored with PENDING status
+3. Assigned auditor reviews request
+4. If approved:
+    - Smart contract transfers credit ownership
+    - Transaction hash is recorded
+    - Request status changes to TRANSFERRED
+    - Plant and industry lifetime statistics are updated
+5. If rejected, status changes to REJECTED
+
+### 4. Credit Retirement Flow
+
+1. Industry submits retirement request for specific credit ID
+2. Request is stored with PENDING status
+3. Assigned auditor reviews request
+4. If approved:
+    - Smart contract marks credit as retired
+    - Transaction hash is recorded
+    - Request status changes to RETIRED
+    - Industry's lifetime retired credits are updated
+5. If rejected, status changes to REJECTED
+
+## API Routes Reference
+
+### Authentication & User Management
+
+-   `POST /users` - Register a new user
+-   `POST /users/:username/login` - User login
+-   `GET /users/:username` - Get user transaction history
+-   `GET /me` - Get current user info
+
+### Credit Issuance (Plant & Auditor)
+
+-   `POST /request/issues` - Create credit issue request
+-   `GET /request/issues` - Get issue requests (for auditor)
+-   `POST /request/issues/:creditId/accept` - Approve issue request
+-   `POST /request/issues/:creditId/reject` - Reject issue request
+
+### Credit Trading (Industry & Auditor)
+
+-   `POST /request/buy` - Create credit buy request
+-   `GET /request/buy` - Get buy requests (for auditor)
+-   `POST /request/buy/:reqId/accept` - Approve buy request
+-   `POST /request/buy/:reqId/reject` - Reject buy request
+
+### Credit Retirement (Industry & Auditor)
+
+-   `POST /request/retire` - Create credit retirement request
+-   `GET /request/retire` - Get retirement requests (for auditor)
+-   `POST /request/retire/:reqId/accept` - Approve retirement request
+-   `POST /request/retire/:reqId/reject` - Reject retirement request
+
+## Security Features
+
+1. **Session-based authentication** - Secure session management with cookies
+2. **Role-based access control** - Endpoints protected by user roles
+3. **Private key management** - Secure handling of Ethereum private keys
+4. **Request validation** - Comprehensive validation of all requests
+5. **Anomaly detection** - Flagging of suspicious transactions
 
 ## Contributing
 
