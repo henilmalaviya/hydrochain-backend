@@ -4,6 +4,7 @@ import {
 	CreditIssueRequestStatus,
 	User,
 } from '@/generated/prisma';
+import { logger } from '@/lib/logger';
 
 export async function getCreditIssueRequestById(creditId: string) {
 	return db.creditIssueRequest.findUnique({
@@ -57,7 +58,9 @@ function detectCreditIssueAnomaly(metadata?: string): boolean {
 			return true;
 		}
 	} catch (error) {
-		return true;
+		logger.error('Error parsing credit buy metadata:', error);
+
+		return false;
 	}
 
 	return false;
@@ -105,7 +108,8 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 			return true;
 		}
 	} catch (error) {
-		return true;
+		logger.error('Error parsing credit buy metadata:', error);
+		return false;
 	}
 
 	return false;
@@ -353,7 +357,8 @@ function detectRetireAnomaly(metadata?: string): boolean {
 		) {
 			return true;
 		}
-	} catch {
+	} catch (error) {
+		logger.error('Error parsing credit buy metadata:', error);
 		return false;
 	}
 
