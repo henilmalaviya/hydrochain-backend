@@ -37,22 +37,23 @@ function detectCreditIssueAnomaly(metadata?: string): boolean {
 
 		if (!parsed) return true;
 
-		if (parsed?.hydrogenProduced <= 0) {
+		if (parsed.hydrogenProduced && parsed.hydrogenProduced <= 0) {
 			return true;
 		}
 
 		if (
-			['solar', 'wind', 'hydro'].includes(parsed.renewableSource) ===
-			false
+			['solar', 'wind', 'hydro'].includes(
+				parsed.renewableSource.toLowerCase(),
+			) === false
 		) {
 			return true;
 		}
 
-		if (parsed.purity < 95) {
+		if (parsed.purity && parsed.purity < 95) {
 			return true;
 		}
 
-		if (parsed.electricityConsumed <= 0) {
+		if (parsed.electricityConsumed && parsed.electricityConsumed <= 0) {
 			return true;
 		}
 	} catch (error) {
@@ -70,7 +71,7 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 
 		if (!parsed) return true;
 
-		if (parsed.hydrogenTransferred <= 0) {
+		if (parsed?.hydrogenTransferred <= 0) {
 			return true;
 		}
 
@@ -81,17 +82,26 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 		};
 
 		if (
+			parsed.transferStart &&
+			parsed.transferEnd &&
 			convertTimeToMinutes(parsed.transferStart) >=
-			convertTimeToMinutes(parsed.transferEnd)
+				convertTimeToMinutes(parsed.transferEnd)
 		) {
 			return true;
 		}
 
-		if (['Pipeline', 'Tanker'].includes(parsed.transferMethod) === false) {
+		if (
+			['Pipeline', 'Tanker'].includes(
+				parsed.transferMethod.toLowerCase(),
+			) === false
+		) {
 			return true;
 		}
 
-		if (parsed.flowRate <= 0 || parsed.pressure <= 0) {
+		if (
+			(parsed.flowRate && parsed.flowRate <= 0) ||
+			(parsed.pressure && parsed.pressure <= 0)
+		) {
 			return true;
 		}
 	} catch (error) {
@@ -332,12 +342,14 @@ function detectRetireAnomaly(metadata?: string): boolean {
 	try {
 		const parsed = JSON.parse(metadata);
 
-		if (parsed.hydrogenConsumed <= 0) {
+		if (parsed?.hydrogenConsumed <= 0) {
 			return true;
 		}
 
 		if (
-			['Solar', 'Wind', 'Hydro'].includes(parsed.energySource) === false
+			['Solar', 'Wind', 'Hydro'].includes(
+				parsed.energySource.toLowerCase(),
+			) === false
 		) {
 			return true;
 		}
