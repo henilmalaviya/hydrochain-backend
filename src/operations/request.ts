@@ -44,7 +44,7 @@ function detectCreditIssueAnomaly(metadata?: string): boolean {
 
 		if (
 			['solar', 'wind', 'hydro'].includes(
-				parsed.renewableSource.toLowerCase(),
+				parsed.renewableSource?.toLowerCase(),
 			) === false
 		) {
 			return true;
@@ -95,7 +95,7 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 
 		if (
 			['Pipeline', 'Tanker'].includes(
-				parsed.transferMethod.toLowerCase(),
+				parsed.transferMethod?.toLowerCase(),
 			) === false
 		) {
 			return true;
@@ -352,7 +352,7 @@ function detectRetireAnomaly(metadata?: string): boolean {
 
 		if (
 			['Solar', 'Wind', 'Hydro'].includes(
-				parsed.energySource.toLowerCase(),
+				parsed.energySource?.toLowerCase(),
 			) === false
 		) {
 			return true;
