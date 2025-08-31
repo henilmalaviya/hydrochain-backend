@@ -36,9 +36,15 @@ function detectCreditIssueAnomaly(metadata?: string): boolean {
 	try {
 		const parsed = JSON.parse(metadata);
 
-		if (!parsed) return true;
+		if (!parsed) {
+			logger.warn('Credit issue anomaly detected: Empty metadata object');
+			return true;
+		}
 
 		if (parsed.hydrogenProduced && parsed.hydrogenProduced <= 0) {
+			logger.warn(
+				`Credit issue anomaly detected: Invalid hydrogen production amount (${parsed.hydrogenProduced})`,
+			);
 			return true;
 		}
 
@@ -47,19 +53,27 @@ function detectCreditIssueAnomaly(metadata?: string): boolean {
 				parsed.renewableSource?.toLowerCase(),
 			) === false
 		) {
+			logger.warn(
+				`Credit issue anomaly detected: Unsupported renewable source (${parsed.renewableSource})`,
+			);
 			return true;
 		}
 
 		if (parsed.purity && parsed.purity < 95) {
+			logger.warn(
+				`Credit issue anomaly detected: Hydrogen purity too low (${parsed.purity}%)`,
+			);
 			return true;
 		}
 
 		if (parsed.electricityConsumed && parsed.electricityConsumed <= 0) {
+			logger.warn(
+				`Credit issue anomaly detected: Invalid electricity consumption (${parsed.electricityConsumed})`,
+			);
 			return true;
 		}
 	} catch (error) {
-		logger.error('Error parsing credit buy metadata:', error);
-
+		logger.error('Error parsing credit issue metadata:', error);
 		return false;
 	}
 
@@ -72,9 +86,15 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 	try {
 		const parsed = JSON.parse(metadata);
 
-		if (!parsed) return true;
+		if (!parsed) {
+			logger.warn('Credit buy anomaly detected: Empty metadata object');
+			return true;
+		}
 
 		if (parsed?.hydrogenTransferred <= 0) {
+			logger.warn(
+				`Credit buy anomaly detected: Invalid hydrogen transfer amount (${parsed.hydrogenTransferred})`,
+			);
 			return true;
 		}
 
@@ -90,6 +110,9 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 			convertTimeToMinutes(parsed.transferStart) >=
 				convertTimeToMinutes(parsed.transferEnd)
 		) {
+			logger.warn(
+				`Credit buy anomaly detected: Invalid transfer time range (${parsed.transferStart} to ${parsed.transferEnd})`,
+			);
 			return true;
 		}
 
@@ -98,6 +121,9 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 				parsed.transferMethod?.toLowerCase(),
 			) === false
 		) {
+			logger.warn(
+				`Credit buy anomaly detected: Unsupported transfer method (${parsed.transferMethod})`,
+			);
 			return true;
 		}
 
@@ -105,6 +131,16 @@ function detectCreditBuyAnomaly(metadata?: string): boolean {
 			(parsed.flowRate && parsed.flowRate <= 0) ||
 			(parsed.pressure && parsed.pressure <= 0)
 		) {
+			if (parsed.flowRate && parsed.flowRate <= 0) {
+				logger.warn(
+					`Credit buy anomaly detected: Invalid flow rate (${parsed.flowRate})`,
+				);
+			}
+			if (parsed.pressure && parsed.pressure <= 0) {
+				logger.warn(
+					`Credit buy anomaly detected: Invalid pressure (${parsed.pressure})`,
+				);
+			}
 			return true;
 		}
 	} catch (error) {
@@ -130,7 +166,7 @@ export async function createCreditIssueRequest(
 
 	// You may want to validate the amount and userId here
 	// Example: create a new CreditIssueRequest in the database
-	return db.creditIssueRequest.create({
+	const request = await db.creditIssueRequest.create({
 		data: {
 			user: {
 				connect: {
@@ -142,6 +178,14 @@ export async function createCreditIssueRequest(
 			anomaly,
 		},
 	});
+
+	if (anomaly) {
+		logger.warn(
+			`Credit issue request ${request.id} from user ${userId} flagged as anomaly with amount ${amount}`,
+		);
+	}
+
+	return request;
 }
 
 export async function acceptCreditIssueRequest(
@@ -250,7 +294,7 @@ export async function createCreditBuyRequest(
 		throw new Error('This credit has already been transferred');
 	}
 
-	return db.creditBuyRequest.create({
+	const request = await db.creditBuyRequest.create({
 		data: {
 			from: {
 				connect: {
@@ -267,6 +311,14 @@ export async function createCreditBuyRequest(
 			metadata,
 		},
 	});
+
+	if (anomaly) {
+		logger.warn(
+			`Credit buy request ${request.id} for credit ${creditId} from ${creditRequest.user.id} to ${toId} flagged as anomaly`,
+		);
+	}
+
+	return request;
 }
 
 export async function acceptCreditBuyRequest(
@@ -346,7 +398,17 @@ function detectRetireAnomaly(metadata?: string): boolean {
 	try {
 		const parsed = JSON.parse(metadata);
 
+		if (!parsed) {
+			logger.warn(
+				'Credit retire anomaly detected: Empty metadata object',
+			);
+			return true;
+		}
+
 		if (parsed?.hydrogenConsumed <= 0) {
+			logger.warn(
+				`Credit retire anomaly detected: Invalid hydrogen consumption amount (${parsed.hydrogenConsumed})`,
+			);
 			return true;
 		}
 
@@ -355,10 +417,13 @@ function detectRetireAnomaly(metadata?: string): boolean {
 				parsed.energySource?.toLowerCase(),
 			) === false
 		) {
+			logger.warn(
+				`Credit retire anomaly detected: Unsupported energy source (${parsed.energySource})`,
+			);
 			return true;
 		}
 	} catch (error) {
-		logger.error('Error parsing credit buy metadata:', error);
+		logger.error('Error parsing credit retire metadata:', error);
 		return false;
 	}
 
@@ -372,7 +437,7 @@ export async function createRetireRequest(
 ) {
 	const anomaly = detectRetireAnomaly(metadata);
 
-	return db.creditRetireRequest.create({
+	const request = await db.creditRetireRequest.create({
 		data: {
 			creditId: creditId,
 			user: {
@@ -384,6 +449,14 @@ export async function createRetireRequest(
 			anomaly,
 		},
 	});
+
+	if (anomaly) {
+		logger.warn(
+			`Credit retire request ${request.id} for credit ${creditId} from user ${userId} flagged as anomaly`,
+		);
+	}
+
+	return request;
 }
 
 export async function getRetireRequestById(creditId: string) {
