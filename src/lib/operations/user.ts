@@ -233,14 +233,24 @@ export async function authenticateUser(
 	// Type assertion to access the did property
 	const userWithDid = user as any;
 
-	if (!userWithDid.did || userWithDid.did !== did) {
-		logger.warn(
-			`Authentication failed - DID mismatch for user: ${username}`,
-		);
-		return null;
-	}
+	// Only check DID for Plant and Industry users, not for Auditor
+	if (
+		(user.role === UserRole.Plant || user.role === UserRole.Industry) &&
+		did
+	) {
+		if (!userWithDid.did || userWithDid.did !== did) {
+			logger.warn(
+				`Authentication failed - DID mismatch for user: ${username} with role ${user.role}`,
+			);
+			return null;
+		}
 
-	logger.info(`DID verification successful for user: ${username}`);
+		logger.info(
+			`DID verification successful for ${user.role} user: ${username}`,
+		);
+	} else if (user.role === UserRole.Auditor && did) {
+		logger.info(`Skipping DID verification for Auditor user: ${username}`);
+	}
 
 	logger.success(`Authentication successful for user: ${username}`);
 	return user;

@@ -43,5 +43,5 @@ export const UserRegistrationSchema = t.Union([
 // Login schema
 export const UserLoginSchema = t.Object({
 	password: t.String(),
-	did: t.String({ minLength: 1 }),
+	did: t.Optional(t.String({ minLength: 1 })),
 });

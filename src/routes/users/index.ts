@@ -200,7 +200,8 @@ export const usersRoutes = new Elysia({
 				);
 				return status(StatusCodes.UNAUTHORIZED, {
 					error: true,
-					message: 'Invalid username or password or did',
+					message:
+						'Invalid username, password, or DID (for Plant/Industry users)',
 				});
 			}
 
