@@ -266,6 +266,7 @@ export const buyRoutes = new Elysia({
 						status: req.status,
 						txnHash: req.txnHash,
 						metadata: req.metadata,
+						anomaly: req.anomaly,
 					})),
 				});
 			},
@@ -287,6 +288,7 @@ export const buyRoutes = new Elysia({
 								status: t.Enum(CreditBuyRequestStatus),
 								txnHash: t.Nullable(t.String()),
 								metadata: t.Nullable(t.String()),
+								anomaly: t.Boolean(),
 							}),
 						),
 					),

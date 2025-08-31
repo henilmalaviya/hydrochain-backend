@@ -347,6 +347,7 @@ export const retireRoute = new Elysia({
 							creditId: req.creditId,
 							status: req.status,
 							metadata: req.metadata,
+							anomaly: req.anomaly,
 						})),
 					});
 				},
@@ -362,6 +363,7 @@ export const retireRoute = new Elysia({
 											CreditRetireRequestStatus,
 										),
 										metadata: t.Nullable(t.String()),
+										anomaly: t.Boolean(),
 									}),
 								),
 							),

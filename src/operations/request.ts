@@ -29,6 +29,78 @@ export async function getCreditBuyRequestById(buyRequestId: string) {
 	});
 }
 
+function detectCreditIssueAnomaly(metadata?: string): boolean {
+	if (!metadata) return false;
+
+	try {
+		const parsed = JSON.parse(metadata);
+
+		if (!parsed) return true;
+
+		if (parsed?.hydrogenProduced <= 0) {
+			return true;
+		}
+
+		if (
+			['solar', 'wind', 'hydro'].includes(parsed.renewableSource) ===
+			false
+		) {
+			return true;
+		}
+
+		if (parsed.purity < 95) {
+			return true;
+		}
+
+		if (parsed.electricityConsumed <= 0) {
+			return true;
+		}
+	} catch (error) {
+		return true;
+	}
+
+	return false;
+}
+
+function detectCreditBuyAnomaly(metadata?: string): boolean {
+	if (!metadata) return false;
+
+	try {
+		const parsed = JSON.parse(metadata);
+
+		if (!parsed) return true;
+
+		if (parsed.hydrogenTransferred <= 0) {
+			return true;
+		}
+
+		// convert 09:00 time to minutes
+		const convertTimeToMinutes = (time: string) => {
+			const [hours, minutes] = time.split(':').map(Number);
+			return hours * 60 + minutes;
+		};
+
+		if (
+			convertTimeToMinutes(parsed.transferStart) >=
+			convertTimeToMinutes(parsed.transferEnd)
+		) {
+			return true;
+		}
+
+		if (['Pipeline', 'Tanker'].includes(parsed.transferMethod) === false) {
+			return true;
+		}
+
+		if (parsed.flowRate <= 0 || parsed.pressure <= 0) {
+			return true;
+		}
+	} catch (error) {
+		return true;
+	}
+
+	return false;
+}
+
 /**
  * Creates a credit issue request for a user with the specified amount.
  * @param userId - The ID of the user requesting the credit issue.
@@ -40,6 +112,8 @@ export async function createCreditIssueRequest(
 	amount: number,
 	metadata?: string,
 ) {
+	const anomaly = detectCreditIssueAnomaly(metadata);
+
 	// You may want to validate the amount and userId here
 	// Example: create a new CreditIssueRequest in the database
 	return db.creditIssueRequest.create({
@@ -51,6 +125,7 @@ export async function createCreditIssueRequest(
 			},
 			amount,
 			metadata,
+			anomaly,
 		},
 	});
 }
@@ -132,12 +207,15 @@ export async function createCreditBuyRequest(
 	creditId: string,
 	metadata?: string,
 ) {
+	const anomaly = detectCreditBuyAnomaly(metadata);
+
 	// Verify that the credit exists, is ISSUED, and hasn't already been transferred
 	const creditRequest = await db.creditIssueRequest.findFirst({
 		where: {
 			id: creditId,
 			status: CreditIssueRequestStatus.ISSUED,
 			metadata: metadata,
+			anomaly,
 		},
 		include: {
 			user: true,
@@ -246,6 +324,28 @@ export async function rejectCreditBuyRequest(buyRequestId: string) {
 			status: CreditBuyRequestStatus.REJECTED,
 		},
 	});
+}
+
+function detectRetireAnomaly(metadata?: string): boolean {
+	if (!metadata) return false;
+
+	try {
+		const parsed = JSON.parse(metadata);
+
+		if (parsed.hydrogenConsumed <= 0) {
+			return true;
+		}
+
+		if (
+			['Solar', 'Wind', 'Hydro'].includes(parsed.energySource) === false
+		) {
+			return true;
+		}
+	} catch {
+		return false;
+	}
+
+	return false;
 }
 
 export async function createRetireRequest(

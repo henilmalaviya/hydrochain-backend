@@ -268,6 +268,7 @@ export const issuesRoutes = new Elysia({
 							status: req.status,
 							txnHash: req.txnHash,
 							createdAt: req.createdAt,
+							anomaly: req.anomaly,
 						})),
 					});
 				},
@@ -289,6 +290,7 @@ export const issuesRoutes = new Elysia({
 										),
 										txnHash: t.Nullable(t.String()),
 										createdAt: t.Date(),
+										anomaly: t.Boolean(),
 									}),
 								),
 							),
